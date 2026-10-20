@@ -1,0 +1,135 @@
+@page "/"
+
+<h1>Chat</h1>
+
+<div class="chat-grid">
+    <div class="chat-panel">
+        <div class="chat-toolbar">
+            <select @bind="_modelId" class="select">
+                @foreach (var m in ModelCatalog.Models)
+                {
+                    <option value="@m.Id">@m.Id — @m.ParametersB B params (Q@(m.QuantBits))</option>
+                }
+            </select>
+            <span class="hint">strategy is chosen automatically (A = one node, B = pipeline split)</span>
+        </div>
+
+        <div class="messages">
+            @foreach (var msg in _messages)
+            {
+                <div class="msg @msg.Role">
+                    <div class="msg-meta">@msg.RoleLabel</div>
+                    <div class="msg-body">@msg.Content</div>
+                    @if (msg.Decision is not null)
+                    {
+                        <div class="decision @msg.Decision.Strategy.ToString().ToLowerInvariant()">
+                            @StrategyBadge(msg.Decision)
+                            <span class="decision-reason">@msg.Decision.Reason</span>
+                            @if (msg.Decision.EstimatedTokensPerSec > 0)
+                            {
+                                <span class="decision-tps">~@msg.Decision.EstimatedTokensPerSec.ToString("0.#") tok/s est.</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            @if (_busy)
+            {
+                <div class="msg assistant"><div class="msg-body typing">…</div></div>
+            }
+        </div>
+
+        <div class="composer">
+            <textarea @bind="_input" @bind:event="oninput" placeholder="Ask something — it runs on the mesh…"
+                      @onkeydown="HandleKeyDown"></textarea>
+            <button class="btn primary" disabled="@_busy" @onclick="SendAsync">Send</button>
+        </div>
+    </div>
+
+    <div class="side-panel">
+        <h3>Cluster snapshot</h3>
+        <p>@_healthy healthy / @_total nodes · @_totalRequests requests served</p>
+        <p class="hint">@_status</p>
+    </div>
+</div>
+
+@code {
+    [Inject] private ChatService Chat { get; set; } = null!;
+    [Inject] private ClusterState Cluster { get; set; } = null!;
+
+    private string _input = "";
+    private string _modelId = "phi-4-mini";
+    private string _status = "";
+    private bool _busy;
+    private readonly List<ChatMsg> _messages = new();
+
+    private int _healthy => Cluster.Nodes.Count(n => n.Health == NodeHealth.Healthy);
+    private int _total => Cluster.Nodes.Count;
+    private long _totalRequests => Cluster.TotalRequests;
+
+    private async Task SendAsync()
+    {
+        var prompt = _input?.Trim();
+        if (string.IsNullOrEmpty(prompt) || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _input = "";
+        _status = "scheduling…";
+
+        _messages.Add(new ChatMsg("user", prompt, null, "You"));
+
+        var assistant = new ChatMsg("assistant", "", null, "Assistant");
+        _messages.Add(assistant);
+
+        var submit = Chat.Submit(_modelId, prompt, null, 256, 0.7f, prefixTag: null);
+        assistant.Decision = submit.Decision;
+        _status = $"{submit.Decision.Strategy} — {submit.Decision.Reason}";
+
+        var inflight = Cluster.GetInflight(submit.RequestId);
+        if (inflight is not null)
+        {
+            await foreach (var chunk in inflight.Stream.Reader.ReadAllAsync())
+            {
+                assistant.Content += chunk;
+                StateHasChanged();
+            }
+        }
+
+        _busy = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey && !e.CtrlKey)
+        {
+            await SendAsync();
+        }
+    }
+
+    private static string StrategyBadge(PlacementDecision d) => d.Strategy switch
+    {
+        SchedulingStrategy.Horizontal => "A · horizontal",
+        SchedulingStrategy.Pipeline => "B · pipeline",
+        _ => "unavailable",
+    };
+
+    private sealed class ChatMsg
+    {
+        public ChatMsg(string role, string content, PlacementDecision? decision, string roleLabel)
+        {
+            Role = role;
+            Content = content;
+            Decision = decision;
+            RoleLabel = roleLabel;
+        }
+
+        public string Role { get; }
+        public string Content { get; set; }
+        public PlacementDecision? Decision { get; set; }
+        public string RoleLabel { get; }
+    }
+}

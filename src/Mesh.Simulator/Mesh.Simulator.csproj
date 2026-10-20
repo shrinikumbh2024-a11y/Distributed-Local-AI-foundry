@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Mesh.Simulator</RootNamespace>
+    <AssemblyName>Mesh.Simulator</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mesh.Abstractions\Mesh.Abstractions.csproj" />
+    <ProjectReference Include="..\Mesh.Core\Mesh.Core.csproj" />
+    <ProjectReference Include="..\Mesh.Runtime\Mesh.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

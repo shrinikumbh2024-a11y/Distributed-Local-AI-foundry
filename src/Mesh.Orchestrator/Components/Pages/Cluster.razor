@@ -1,0 +1,84 @@
+@page "/cluster"
+@implements IDisposable
+
+<h1>Cluster</h1>
+
+<div class="summary-cards">
+    <div class="card"><div class="card-num">@_healthy</div><div class="card-label">healthy nodes</div></div>
+    <div class="card"><div class="card-num">@_total</div><div class="card-label">registered</div></div>
+    <div class="card"><div class="card-num">@_cores</div><div class="card-label">CPU cores pooled</div></div>
+    <div class="card"><div class="card-num">@FormatBytes(_ram)</div><div class="card-label">RAM pooled</div></div>
+</div>
+
+@if (_total == 0)
+{
+    <div class="empty">
+        No agents connected. Run an agent to join the mesh:
+        <code>dotnet run --project src/Mesh.Agent -- --orchestrator ws://&lt;host&gt;:5198/agents --name node-01</code>
+    </div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Node</th>
+                <th>Host</th>
+                <th>Cores</th>
+                <th>RAM</th>
+                <th>Fabric</th>
+                <th>Load (active/queued)</th>
+                <th>tok/s</th>
+                <th>Models loaded</th>
+                <th>Health</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var n in State.Nodes)
+            {
+                <tr>
+                    <td>@n.Name</td>
+                    <td>@n.Host</td>
+                    <td>@n.Capability.CpuCores</td>
+                    <td>@FormatBytes(n.Capability.TotalMemoryBytes)</td>
+                    <td>@n.Capability.FabricGroup</td>
+                    <td>@n.Load.ActiveRequests / @n.Load.QueuedRequests</td>
+                    <td>@n.Load.MeasuredTokensPerSec.ToString("0.#")</td>
+                    <td>@string.Join(", ", n.Models.Where(m => m.Loaded).Select(m => m.ModelId))</td>
+                    <td><span class="badge @HealthBadge(n.Health)">@n.Health</span></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Inject] private ClusterState State { get; set; } = null!;
+
+    private int _healthy => State.Nodes.Count(n => n.Health == NodeHealth.Healthy);
+    private int _total => State.Nodes.Count;
+    private int _cores => State.Nodes.Where(n => n.Health == NodeHealth.Healthy).Sum(n => n.Capability.CpuCores);
+    private long _ram => State.Nodes.Where(n => n.Health == NodeHealth.Healthy).Sum(n => n.Capability.TotalMemoryBytes);
+
+    protected override void OnInitialized() => State.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => State.Changed -= OnChanged;
+
+    private static string HealthBadge(NodeHealth h) => h switch
+    {
+        NodeHealth.Healthy => "ok",
+        NodeHealth.Degraded => "warn",
+        _ => "bad",
+    };
+
+    private static string FormatBytes(long b)
+    {
+        string[] units = { "B", "KiB", "MiB", "GiB", "TiB" };
+        var v = (double)b;
+        var i = 0;
+        while (v >= 1024 && i < units.Length - 1) { v /= 1024; i++; }
+        return $"{v:0.#} {units[i]}";
+    }
+}

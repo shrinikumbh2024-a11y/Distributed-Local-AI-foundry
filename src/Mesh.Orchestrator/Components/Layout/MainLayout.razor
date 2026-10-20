@@ -1,0 +1,18 @@
+@inherits LayoutComponentBase
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-dot"></span>
+            <span>Local AI Mesh</span>
+        </div>
+        <NavMenu />
+        <div class="sidebar-foot">
+            <a href="/api/health" target="_blank" class="foot-link">health</a>
+            <a href="/api/nodes" target="_blank" class="foot-link">api/nodes</a>
+        </div>
+    </aside>
+    <main class="main">
+        @Body
+    </main>
+</div>

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    OPT-IN project. NOT part of the default solution build.
+    It requires the Microsoft Foundry Local SDK, which is fetched from NuGet
+    (network access needed). Enable it on a real node with:
+
+        dotnet add reference (into Mesh.Agent) pointing at this project
+        dotnet sln add src/Mesh.Runtime.FoundryLocal/Mesh.Runtime.FoundryLocal.csproj
+
+    On Windows with hardware acceleration use Microsoft.AI.Foundry.Local.WinML;
+    the portable package (below) works on Windows/macOS/Linux without WinML.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Mesh.Runtime.FoundryLocal</RootNamespace>
+    <AssemblyName>Mesh.Runtime.FoundryLocal</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mesh.Abstractions\Mesh.Abstractions.csproj" />
+    <ProjectReference Include="..\Mesh.Runtime\Mesh.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Uncomment the Windows-accelerated package on Windows 11 24H2+:
+    <PackageReference Include="Microsoft.AI.Foundry.Local.WinML" Version="*" />
+    -->
+    <PackageReference Include="Microsoft.AI.Foundry.Local" Version="*" />
+  </ItemGroup>
+
+</Project>

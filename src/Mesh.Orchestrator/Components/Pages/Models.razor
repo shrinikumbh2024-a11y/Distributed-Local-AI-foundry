@@ -1,0 +1,62 @@
+@page "/models"
+
+<h1>Models</h1>
+<p class="hint">
+    Planning math for the reference node (Intel i7, 16 GB RAM → ~10 GB usable after
+    reserving 6 GB for the OS and activations). A model that fits one node is served
+    horizontally (A); bigger models are pipeline-split (B).
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Model</th>
+            <th>Params</th>
+            <th>Precision</th>
+            <th>Layers</th>
+            <th>Est. resident</th>
+            <th>Fits 16 GB node</th>
+            <th>Nodes (pipeline)</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var m in ModelCatalog.Models)
+        {
+            var mem = _planner.EstimateMemoryBytes(m);
+            var fits = mem <= _refNodeUsable;
+            var minNodes = (int)Math.Ceiling(mem / (double)_refNodeUsable);
+            <tr>
+                <td><code>@m.Id</code></td>
+                <td>@m.ParametersB B</td>
+                <td>Q@(m.QuantBits)</td>
+                <td>@m.Layers</td>
+                <td>@FormatBytes(mem)</td>
+                <td>
+                    @if (fits)
+                    {
+                        <span class="badge ok">yes → A</span>
+                    }
+                    else
+                    {
+                        <span class="badge warn">no → B</span>
+                    }
+                </td>
+                <td>@minNodes</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private readonly ModelPlanner _planner = new();
+    private const long _refNodeUsable = 10L * 1024 * 1024 * 1024; // 10 GiB usable
+
+    private static string FormatBytes(long b)
+    {
+        string[] units = { "B", "KiB", "MiB", "GiB", "TiB" };
+        var v = (double)b;
+        var i = 0;
+        while (v >= 1024 && i < units.Length - 1) { v /= 1024; i++; }
+        return $"{v:0.#} {units[i]}";
+    }
+}

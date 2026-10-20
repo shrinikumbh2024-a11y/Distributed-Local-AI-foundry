@@ -1,0 +1,37 @@
+@page "/telemetry"
+@implements IDisposable
+
+<h1>Telemetry</h1>
+
+<p class="hint">Measured tokens/sec per healthy node (from each agent's local benchmark, smoothed).</p>
+
+<div class="summary-cards">
+    <div class="card"><div class="card-num">@_totalRequests</div><div class="card-label">requests served</div></div>
+    <div class="card"><div class="card-num">@_aggregateTps.ToString("0.#")</div><div class="card-label">aggregate tok/s</div></div>
+</div>
+
+<div class="bars">
+    @foreach (var n in Cluster.Nodes.Where(n => n.Health == NodeHealth.Healthy).OrderByDescending(n => n.Load.MeasuredTokensPerSec))
+    {
+        var width = (int)Math.Clamp(n.Load.MeasuredTokensPerSec / _maxTps * 100, 2, 100);
+        <div class="bar-row">
+            <div class="bar-label">@n.Name</div>
+            <div class="bar-track"><div class="bar-fill" style="width:@(width)%"></div></div>
+            <div class="bar-value">@n.Load.MeasuredTokensPerSec.ToString("0.#") tok/s</div>
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] private ClusterState Cluster { get; set; } = null!;
+
+    private long _totalRequests => Cluster.TotalRequests;
+    private double _aggregateTps => Cluster.Nodes.Where(n => n.Health == NodeHealth.Healthy).Sum(n => n.Load.MeasuredTokensPerSec);
+    private double _maxTps => Math.Max(Cluster.Nodes.Where(n => n.Health == NodeHealth.Healthy).Select(n => n.Load.MeasuredTokensPerSec).DefaultIfEmpty(1).Max(), 1);
+
+    protected override void OnInitialized() => Cluster.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Cluster.Changed -= OnChanged;
+}

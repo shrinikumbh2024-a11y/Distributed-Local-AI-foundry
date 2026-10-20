@@ -1,0 +1,22 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+
+# Local cache redirects used inside the DSH sandbox (harmless elsewhere)
+.dotnet-cli-home/
+.nuget-packages/
+
+# Build artifacts & packaged app — too large for git; rebuild via build.ps1 / dotnet publish
+dist/
+LocalAiMesh/
+*.zip
+*.log
+
+# Local runtime data
+data/
+*.db
+*.db-journal
+.running.json
+.agent-pids.txt
